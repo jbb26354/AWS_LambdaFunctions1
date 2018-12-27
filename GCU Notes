@@ -1,0 +1,79 @@
+
+# I like my talks to help you work through errors, so you can debug your own stuff.
+# I'm frusrated by talks were everything works great, and you go home to try to do it yourself, and struggle to replicate it.
+# This talk we're going to get errors for about 30 minutes until we get all the infrastructure in place.
+
+
+Send a Request
+
+http -v POST  https://q6pxm33wr3.execute-api.us-east-2.amazonaws.com/default/gcu2 x-api-key:4JNugP5RCC1AtHnqE9WpT3AaZOTbKjHh7ioBFYnY key=value
+
+
+#configure Logging
+
+import logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+# Example: logger.info('got event{}'.format(event))
+
+
+
+# Show the missing TableName error
+# Bring up the request Documentation
+https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.put_item
+
+
+http -v POST  https://q6pxm33wr3.execute-api.us-east-2.amazonaws.com/default/gcu2 x-api-key:4JNugP5RCC1AtHnqE9WpT3AaZOTbKjHh7ioBFYnY TableName=GCUPasteBin Item:='"quote"="I like pizza"'
+
+#this will error, but lets just see what it is and work through it
+http -v POST  https://q6pxm33wr3.execute-api.us-east-2.amazonaws.com/default/gcu2 x-api-key:4JNugP5RCC1AtHnqE9WpT3AaZOTbKjHh7ioBFYnY TableName=GCUPasteBin Item:='["pizza", "paint"]'
+
+## Example Error
+Invalid type for parameter Item, value: ['pizza', 'paint'], type: <class 'list'>, valid types: <class 'dict'>
+
+
+http -v POST  https://q6pxm33wr3.execute-api.us-east-2.amazonaws.com/default/gcu2 x-api-key:4JNugP5RCC1AtHnqE9WpT3AaZOTbKjHh7ioBFYnY TableName=GCUPasteBin Item:='{"quote": "I like pizza"}'
+
+
+#Resource not found error
+http -v POST  https://q6pxm33wr3.execute-api.us-east-2.amazonaws.com/default/gcu2 x-api-key:4JNugP5RCC1AtHnqE9WpT3AaZOTbKjHh7ioBFYnY TableName=GCUPasteBin Item:='{"quote": {"S": "I like pizza"}}'
+
+#Jump over to dynamo and create a table
+
+#Add the id type
+http -v POST  https://q6pxm33wr3.execute-api.us-east-2.amazonaws.com/default/gcu2 x-api-key:4JNugP5RCC1AtHnqE9WpT3AaZOTbKjHh7ioBFYnY TableName=GCUPasteBin Item:='{"id": {"N": 1}, "quote": {"S": "I like pizza"}}'
+
+# Oh we forgot to quote it... whoa! It works!!!
+http -v POST  https://q6pxm33wr3.execute-api.us-east-2.amazonaws.com/default/gcu2 x-api-key:4JNugP5RCC1AtHnqE9WpT3AaZOTbKjHh7ioBFYnY TableName=GCUPasteBin Item:='{"id": {"N": "1"}, "quote": {"S": "I like pizza"}}'
+
+http -v POST  https://q6pxm33wr3.execute-api.us-east-2.amazonaws.com/default/gcu2 x-api-key:4JNugP5RCC1AtHnqE9WpT3AaZOTbKjHh7ioBFYnY TableName=GCUPasteBin Item:='{"id": {"N": "1"}, "quote": {"S": "I like pizza"}, "movie": {"S": "Multiplicity"}, "actor": {"S": "Michael Keaton"}}'
+
+
+
+# Okay, but this api is pretty terrible.  We basically are just acting as a front to Dynamo. 
+## We want to abstract away dynamo DB. 
+## We want our API to be human friendly. Something not so generic, but specific to our application.
+
+# Basically we want to post json documents like this:
+
+{ 
+	"quote": "I like pizza",
+	"movie": "Multiplicity"
+}
+
+Simple. We have a bug right now, because we expose the id to the user, they can over write anyone's data.
+
+Our code should:
+1. Build an Id
+2. Verify our request document
+3. Commit to the database
+4. Return the result.
+
+
+http -v POST  https://q6pxm33wr3.execute-api.us-east-2.amazonaws.com/default/gcu2 x-api-key:4JNugP5RCC1AtHnqE9WpT3AaZOTbKjHh7ioBFYnY quote="Frankly my dear, I don't give a damn." movie="Casablanca"
+
+But if we do this multiple times, then we get a new id each time, what if we want to replace an item already there? That's the difference between put and post. put it idempotent.
+
+
+
+
